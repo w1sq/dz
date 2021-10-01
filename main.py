@@ -48,14 +48,6 @@ website_keyboard = ReplyKeyboardMarkup(resize_keyboard=True,one_time_keyboard=Tr
 sdamgia_subjects_keyboard = InlineKeyboardMarkup(resize_keyboard=True).row(InlineKeyboardButton(text='Русский',callback_data='sdamgia_rus'))
 sdamgia_exams_keyboard = InlineKeyboardMarkup(resize_keyboard=True).row(InlineKeyboardButton(text='ЕГЭ',callback_data='sdamgia_ege'))
 
-@dp.message_handler(state='*', commands='❌Отмена')
-@dp.message_handler(state='*', commands='cancel')
-@dp.message_handler(Text(equals='cancel', ignore_case=True), state='*')
-async def cancel_handler(state: FSMContext):
-    current_state = await state.get_state()
-    logging.info('Cancelling state %r', current_state)
-    await state.finish()
-
 
 @dp.message_handler(commands=['start'])
 async def start(message):
@@ -69,19 +61,23 @@ async def search_serial(message):
 @dp.message_handler(state=GetNumber.rus_ege_sdamgia_ru)
 async def process_name(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
-        try:
-            msg = int(message.text)
-            webpage = requests.get(f'https://rus-ege.sdamgia.ru/problem?id={message.text}').text
-            if 'Такого задания не существует.' not in webpage:
-                soup = BeautifulSoup (webpage, 'html.parser')
-                keyb =  InlineKeyboardMarkup(resize_keyboard=True).row(InlineKeyboardButton(text='Вернуться к выбору предмета',callback_data='sdamgia_ege')).row(InlineKeyboardButton(text='Вернуться к выбору экзамена',callback_data='choose_exam')).row(InlineKeyboardButton(text='Ввести номер нового задания',callback_data='sdamgia_rus'))
-                await message.answer(soup.find("div", class_="answer").text,reply_markup=keyb)
-                data.state = None
-            else:
-                await message.answer('Задания не найдено')
-                data.state = None
-        except ValueError:
-            await message.answer('Неправильный формат ввода, попробуйте снова\nвведите cancel для отмены')
+        keyb =  InlineKeyboardMarkup(resize_keyboard=True).row(InlineKeyboardButton(text='Вернуться к выбору предмета',callback_data='sdamgia_ege')).row(InlineKeyboardButton(text='Вернуться к выбору экзамена',callback_data='choose_exam')).row(InlineKeyboardButton(text='Ввести номер нового задания',callback_data='sdamgia_rus'))
+        if message.text == 'cancel':
+            await message.answer('Успешно отменено',reply_markup=keyb)
+            await message.delete()
+            data.state = None
+        else:
+            try:
+                msg = int(message.text)
+                webpage = requests.get(f'https://rus-ege.sdamgia.ru/problem?id={message.text}').text
+                if 'Такого задания не существует.' not in webpage:
+                    soup = BeautifulSoup (webpage, 'html.parser')
+                    await message.answer(soup.find("div", class_="answer").text,reply_markup=keyb)
+                    data.state = None
+                else:
+                    await message.answer('Задания не найдено, попробуйте снова\nвведите cancel для отмены')
+            except ValueError:
+                await message.answer('Неправильный формат ввода, попробуйте снова\nвведите cancel для отмены')
 
 async def sdamgia_rus(call,*args):
     message = call.message
