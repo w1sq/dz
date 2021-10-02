@@ -61,7 +61,7 @@ async def search_serial(message):
 @dp.message_handler(state=GetNumber.rus_ege_sdamgia_ru)
 async def process_name(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
-        keyb =  InlineKeyboardMarkup(resize_keyboard=True).row(InlineKeyboardButton(text='Вернуться к выбору предмета',callback_data='sdamgia_ege')).row(InlineKeyboardButton(text='Вернуться к выбору экзамена',callback_data='choose_exam')).row(InlineKeyboardButton(text='Ввести номер нового задания',callback_data='sdamgia_rus'))
+        keyb =  InlineKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True).row(InlineKeyboardButton(text='Вернуться к выбору предмета',callback_data='sdamgia_ege')).row(InlineKeyboardButton(text='Вернуться к выбору экзамена',callback_data='choose_exam')).row(InlineKeyboardButton(text='Ввести номер нового задания',callback_data='sdamgia_rus True'))
         if message.text == 'cancel':
             await message.answer('Успешно отменено',reply_markup=keyb)
             await message.delete()
@@ -70,20 +70,23 @@ async def process_name(message: types.Message, state: FSMContext):
             try:
                 msg = int(message.text)
                 webpage = requests.get(f'https://rus-ege.sdamgia.ru/problem?id={message.text}').text
-                if 'Такого задания не существует.' not in webpage:
-                    soup = BeautifulSoup (webpage, 'html.parser')
-                    await message.answer(soup.find("div", class_="answer").text,reply_markup=keyb)
+                soup = BeautifulSoup (webpage, 'html.parser')
+                anwswer = soup.find_all("div", class_="answer")[-1].text
+                if anwswer:
+                    await message.answer(f'Задание №{message.text}\n'+anwswer,reply_markup=keyb)
                     data.state = None
                 else:
                     await message.answer('Задания не найдено, попробуйте снова\nвведите cancel для отмены')
             except ValueError:
                 await message.answer('Неправильный формат ввода, попробуйте снова\nвведите cancel для отмены')
 
-async def sdamgia_rus(call,*args):
+async def sdamgia_rus(call,mode=False,*args):
     message = call.message
     await GetNumber.rus_ege_sdamgia_ru.set()
     await message.answer('Введите номер задания')
-    await message.delete()
+    await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,text=call.message.text, reply_markup=None)
+    if not mode:
+        await message.delete()
 
 async def sdamgia_ege(call,*args):
     message = call.message    
